@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'application'
 }
 
 group 'com.debuggingsuccess'
@@ -9,13 +10,26 @@ wrapper {
     gradleVersion = '7.2'
 }
 
+application {
+    mainClassName = 'com.debuggingsuccess.gitport.Main'
+}
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.1'
+    implementation "com.typesafe:config:1.4.1"
+    implementation "org.slf4j:slf4j-log4j12:1.7.32"
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
+}
+
+run {
+    // Pass all the properties when starting the new JVM
+    systemProperties System.getProperties()
 }
 
 test {

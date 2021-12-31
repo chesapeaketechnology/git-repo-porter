@@ -63,3 +63,6 @@ gradle-app.setting
 .classpath
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij,gradle,java
+
+# Ignore local copy of config file so user/password credentials don't get committed
+application.conf
