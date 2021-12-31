@@ -42,6 +42,17 @@ public class Main
             reposToExclude.forEach(repoUrlMap::remove);
 
             logger.info("Repos to port for project {}: {}", projectKey, repoUrlMap.keySet());
+
+            String gitlabHost = config.getString(CONFIG_ROOT + ".target.host");
+            String accessToken = config.getString(CONFIG_ROOT + ".target.accessToken");
+            GitLabService gitLabService = new GitLabService(gitlabHost, accessToken);
+            logger.info("Created GitLab service for {}", gitlabHost);
+
+            String groupName = config.getString(CONFIG_ROOT + ".target.groupName");
+            int parentGroupId = config.getInt(CONFIG_ROOT + ".target.parentGroupId");
+            int groupId = gitLabService.getOrCreateGroupId(groupName, parentGroupId);
+            logger.info("Id for group {}: {}", groupName, groupId);
+
         } catch (Exception e)
         {
             logger.error("Error porting repos", e);
