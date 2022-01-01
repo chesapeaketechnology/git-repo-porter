@@ -23,22 +23,22 @@ public class BitbucketService extends ARestService
     private static final String PROJECTS_ENDPOINT = REST_API_ROOT + "/projects";
     private final String authHeaderValue;
 
-    public BitbucketService(String host, String username, String password)
+    public BitbucketService(String host, String username, String accessToken)
     {
         super(host);
-        authHeaderValue = getBasicAuthHeaderValue(username, password);
+        authHeaderValue = getBasicAuthHeaderValue(username, accessToken);
     }
 
     /**
      * @param username The username for accessing Bitbucket
-     * @param password The password for accessing Bitbucket
+     * @param accessToken The personal access token for accessing Bitbucket
      * @return The header value for basic authentication.
      * @see <a href="https://developer.atlassian.com/server/bitbucket/how-tos/example-basic-authentication/">
      * Authenticating with the REST API</a>
      */
-    private String getBasicAuthHeaderValue(String username, String password)
+    private String getBasicAuthHeaderValue(String username, String accessToken)
     {
-        return "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+        return "Basic " + Base64.getEncoder().encodeToString((username + ":" + accessToken).getBytes());
     }
 
     /**

@@ -26,6 +26,9 @@ public class GitLabService extends ARestService
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     private static final String REST_API_ROOT = "/api/v4";
     private static final String GROUPS_ENDPOINT = REST_API_ROOT + "/groups";
+    private static final String IMPORT_BITBUCKET_ENDPOINT = REST_API_ROOT + "/import/bitbucket_server";
+    private static final String NAMESPACES_ENDPOINT = REST_API_ROOT + "/namespaces";
+    private static final String PROJECTS_ENDPOINT = REST_API_ROOT + "/projects";
     private final String accessTokenParam;
 
     public GitLabService(String host, String accessToken)
@@ -93,10 +96,33 @@ public class GitLabService extends ARestService
             }
         } catch (Exception e)
         {
-            throw new IOException("Error getting group " + groupName + ": " + e.getMessage(), e);
+            throw new IOException("Error getting id for group " + groupName + ": " + e.getMessage(), e);
         }
 
         return -1;
+    }
+
+    /**
+     * @param groupId The id of the group to find
+     * @return The path of the group
+     * @throws IOException if an error occurred querying for the group
+     */
+    public String getGroupPath(int groupId) throws IOException
+    {
+        try
+        {
+            HttpRequest request = HttpRequest.newBuilder(getUri(NAMESPACES_ENDPOINT + "/" + groupId, new ArrayList<>()))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+
+            JsonNode jsonNode = objectMapper.readTree(response.body());
+            return jsonNode.get("full_path").textValue();
+        } catch (Exception e)
+        {
+            throw new IOException("Error getting path for group " + groupId + ": " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -131,6 +157,76 @@ public class GitLabService extends ARestService
         } catch (Exception e)
         {
             throw new IOException("Error creating group " + groupName + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Creates a project by importing the repo from the provided URL.
+     *
+     * @param projectName   The name of the project
+     * @param importUrl     The import URL (which should include the username and password/access token)
+     * @param parentGroupId The id of the GitLab group where the project should be created
+     * @throws IOException if an error occurred creating the project
+     */
+    public void createProjectFromUrl(String projectName, String importUrl, int parentGroupId) throws IOException
+    {
+        try
+        {
+            String groupPath = getGroupPath(parentGroupId);
+
+            Map<String, Object> jsonMap = new HashMap<>();
+            jsonMap.put("name", projectName);
+            jsonMap.put("import_url", importUrl);
+            jsonMap.put("namespace_id", parentGroupId);
+
+            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT, new ArrayList<>()))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error creating project " + projectName + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Imports a repo from a Bitbucket instance into GitLab.
+     *
+     * @param bbServerUrl   The Bitbucket server URL
+     * @param bbUsername    The Bitbucket username
+     * @param bbAccessToken The Bitbucket personal access token or password
+     * @param bbProjectKey  The Bitbucket project key
+     * @param bbRepoName    The name of the Bitbucket repo
+     * @param parentGroupId The id of the target group in GitLab
+     * @see <a href="https://docs.gitlab.com/ee/api/import.html#import-repository-from-bitbucket-server">Import
+     * repository from Bitbucket Server</a>
+     */
+    public void importFromBitbucket(String bbServerUrl, String bbUsername, String bbAccessToken, String bbProjectKey,
+                                    String bbRepoName, int parentGroupId) throws IOException
+    {
+        try
+        {
+            String groupPath = getGroupPath(parentGroupId);
+
+            Map<String, Object> jsonMap = new HashMap<>();
+            jsonMap.put("bitbucket_server_url", bbServerUrl);
+            jsonMap.put("bitbucket_server_username", bbUsername);
+            jsonMap.put("personal_access_token", bbAccessToken);
+            jsonMap.put("bitbucket_server_project", bbProjectKey);
+            jsonMap.put("bitbucket_server_repo", bbRepoName);
+            jsonMap.put("target_namespace", groupPath);
+
+            HttpRequest request = HttpRequest.newBuilder(getUri(IMPORT_BITBUCKET_ENDPOINT, new ArrayList<>()))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error importing repo " + bbRepoName + ": " + e.getMessage(), e);
         }
     }
 

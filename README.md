@@ -4,11 +4,17 @@ Tool for porting a group of repos from Bitbucket to GitLab
 ## Usage
 1. Create a copy of _src/main/resources/application.conf_ and fill in all the settings with appropriate values.
    (Note: of course you could modify it in place as well, but take care not to commit the changes, as it will contain
-   your plain text username and password.) If you place the copy in the root of the repo, it will be ignored by git.
+   your plain text username and access token.) If you place the copy in the root of the repo, it will be ignored by git.
 
-2. Create a personal access token in GitLab with a scope of `api` ([see instructions here](
-   https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html)) and add it to the _application.conf_ for the
-   `target.accessToken` setting.
+   For the access tokens:
+
+   1. Create a personal access token in Bitbucket with a scope of **Project read** ([instructions here](
+      https://confluence.atlassian.com/bitbucketserver/personal-access-tokens-939515499.html)) and add it to the 
+      _application.conf_ as the `source.accessToken` setting.
+
+   2. Create a personal access token in GitLab with a scope of **api** ([instructions here](
+      https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html)) and add it to the _application.conf_ as the
+      `target.accessToken` setting.
 
 3. Execute the `run` task with the system property `config.file` set to the location of your local _application.conf_:
    ```

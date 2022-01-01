@@ -77,7 +77,8 @@ public abstract class ARestService
         final int statusCode = response.statusCode();
         if (statusCode != HttpURLConnection.HTTP_OK && statusCode != HttpURLConnection.HTTP_CREATED)
         {
-            throw new IOException("GET from " + request.uri() + " was unsuccessful. Status code: " + statusCode);
+            throw new IOException(request.method() + " from " + request.uri() + " was unsuccessful. Status code: " +
+                    statusCode + ". Response body: " + response.body());
         }
 
         return response;
