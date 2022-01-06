@@ -210,6 +210,32 @@ public class GitLabService extends ARestService
     }
 
     /**
+     * Gets the status of importing a repo.
+     *
+     * @param repoId The id of the repo
+     * @return The status of the import as a string.
+     * @throws IOException if an error occurred querying for the import status
+     */
+    public String getImportStatus(int repoId) throws IOException
+    {
+        try
+        {
+            String endpoint = PROJECTS_ENDPOINT + "/" + repoId + "/import";
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+
+            JsonNode jsonNode = objectMapper.readTree(response.body());
+            return jsonNode.get("import_status").textValue();
+        } catch (Exception e)
+        {
+            throw new IOException("Error getting import status for repo " + repoId + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Attempts to find a repo with the specified name in the group.
      *
      * @param repoName The name of the repo
@@ -304,7 +330,7 @@ public class GitLabService extends ARestService
     /**
      * Convenience method that doesn't include pagination parameters or other query params besides access token.
      *
-     * @param endpoint    The REST endpoint
+     * @param endpoint The REST endpoint
      * @return The URI for the REST request
      * @throws URISyntaxException if an error occurred constructing the URI
      */
@@ -316,7 +342,7 @@ public class GitLabService extends ARestService
     /**
      * Convenience method that includes pagination parameters but no other query params besides access token.
      *
-     * @param endpoint    The REST endpoint
+     * @param endpoint The REST endpoint
      * @return The URI for the REST request
      * @throws URISyntaxException if an error occurred constructing the URI
      */
@@ -328,8 +354,8 @@ public class GitLabService extends ARestService
     /**
      * Convenience method that defaults the pagination limit to the max value and includes the access token query param.
      *
-     * @param endpoint    The REST endpoint
-     * @param queryParams List of any additional query params to include in the request
+     * @param endpoint     The REST endpoint
+     * @param queryParams  List of any additional query params to include in the request
      * @param pagedRequest Indicates if the request is a paged request
      * @return The URI for the REST request
      * @throws URISyntaxException if an error occurred constructing the URI

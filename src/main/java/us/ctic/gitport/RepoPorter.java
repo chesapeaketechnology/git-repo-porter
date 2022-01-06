@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.util.Objects;
 
 /**
  * Ports repos from Bitbucket to GitLab.
@@ -43,6 +44,13 @@ public class RepoPorter
 
         // Configure repo with our preferred settings
         gitLabService.configureProjectSettings(repo.getId());
+
+        // Wait until the import is complete or the description will get overwritten with the description from the
+        // parent Bitbucket project
+        String status;
+        do {
+            status = gitLabService.getImportStatus(repo.getId());
+        } while (!Objects.equals(status, "finished"));
 
         // If the Bitbucket repo had a description, copy it to GitLab. Otherwise, just set it to an empty string since
         // the project description is used instead of the repo description during import
