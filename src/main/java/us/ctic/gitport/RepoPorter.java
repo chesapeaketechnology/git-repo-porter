@@ -44,13 +44,10 @@ public class RepoPorter
         // Configure repo with our preferred settings
         gitLabService.configureProjectSettings(repo.getId());
 
-        // If the Bitbucket repo had a description, copy it to GitLab (during import, the project description is used
-        // instead of the repo description)
+        // If the Bitbucket repo had a description, copy it to GitLab. Otherwise, just set it to an empty string since
+        // the project description is used instead of the repo description during import
         final String repoDescription = bitbucketService.getRepoDescription(projectKey, repoName);
-        if (repoDescription != null && !repoDescription.isBlank())
-        {
-            gitLabService.updateProjectDescription(repo.getId(), repoDescription);
-        }
+        gitLabService.updateProjectDescription(repo.getId(), repoDescription);
 
         return repo;
     }

@@ -163,7 +163,7 @@ public class BitbucketService extends ARestService
      * @param repoName      The name of the repo to query for files
      * @param fileName      The name of the file
      * @param fileBody      A file containing the contents to commit to the repo in the named file
-     * @param commitMessage The message to use when commiting the updated file
+     * @param commitMessage The message to use when committing the updated file
      * @param branchName    The name of the branch to update
      * @param commitId      The commit id of the file before it was edited (or null if this is a new file)
      * @throws IOException if an error occurred putting the file.
@@ -173,14 +173,14 @@ public class BitbucketService extends ARestService
     {
         try
         {
-            final MultipartBodyPublisher multipartBodyPublisher = MultipartBodyPublisher.newBuilder()
+            final MultipartBodyPublisher.Builder builder = MultipartBodyPublisher.newBuilder()
                     .filePart("content", fileBody.toPath(), MediaType.TEXT_ANY)
                     .textPart("message", commitMessage)
                     .textPart("branch", branchName)
-                    .textPart("sourceCommitId", commitId)
-                    .boundary(UUID.randomUUID().toString())
-                    .build();
+                    .boundary(UUID.randomUUID().toString());
+            if (commitId != null) builder.textPart("sourceCommitId", commitId);
 
+            final MultipartBodyPublisher multipartBodyPublisher = builder.build();
             String reposEndpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName + "/browse/" + fileName;
             HttpRequest request = HttpRequest.newBuilder(getUri(reposEndpoint))
                     .PUT(multipartBodyPublisher)
@@ -200,7 +200,7 @@ public class BitbucketService extends ARestService
      *
      * @param projectKey The key of the project
      * @param repoName   The name of the repo to update
-     * @return The description for the repo or null if one isn't set.
+     * @return The description for the repo or an empty string if one isn't set.
      * @throws IOException if an error occurred getting the description.
      */
     public String getRepoDescription(String projectKey, String repoName) throws IOException
@@ -217,7 +217,7 @@ public class BitbucketService extends ARestService
             final HttpResponse<String> response = getStringHttpResponse(request);
             JsonNode jsonNode = objectMapper.readTree(response.body());
             final JsonNode descriptionNode = jsonNode.get("description");
-            return descriptionNode == null ? null : descriptionNode.textValue();
+            return descriptionNode == null ? "" : descriptionNode.textValue();
         } catch (Exception e)
         {
             throw new IOException("Error updating repo description: " + e.getMessage(), e);

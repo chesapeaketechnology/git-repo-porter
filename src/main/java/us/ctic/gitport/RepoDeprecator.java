@@ -121,9 +121,11 @@ public class RepoDeprecator
         // We need the info about the branch in order to update the file
         final BitbucketBranch defaultBranch = bitbucketService.getDefaultBranch(projectKey, repoName);
 
+        // If this is a new file, pass null for the commit id so Bitbucket won't try to update a non-existent file
+        final String commitId = readmeFile == null ? null : defaultBranch.getLatestCommit();
         String commitMessage = "Update " + readmeFileName + " with deprecation banner";
         bitbucketService.updateFile(projectKey, repoName, readmeFileName, updatedReadmeFile, commitMessage,
-                defaultBranch.getDisplayId(), defaultBranch.getLatestCommit());
+                defaultBranch.getDisplayId(), commitId);
     }
 
     /**
