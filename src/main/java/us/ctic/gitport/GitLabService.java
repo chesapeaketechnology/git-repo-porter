@@ -268,7 +268,7 @@ public class GitLabService extends ARestService
                     .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
 
-            final HttpResponse<String> response = getStringHttpResponse(request);
+            getStringHttpResponse(request);
         } catch (Exception e)
         {
             throw new IOException("Error configuring repo " + projectId + ": " + e.getMessage(), e);
@@ -294,7 +294,7 @@ public class GitLabService extends ARestService
                     .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
 
-            final HttpResponse<String> response = getStringHttpResponse(request);
+            getStringHttpResponse(request);
         } catch (Exception e)
         {
             throw new IOException("Error updating repo description: " + e.getMessage(), e);

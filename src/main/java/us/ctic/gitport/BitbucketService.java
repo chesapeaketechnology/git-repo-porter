@@ -188,7 +188,7 @@ public class BitbucketService extends ARestService
                     .header("Content-Type", "multipart/form-data; boundary=" + multipartBodyPublisher.boundary())
                     .build();
 
-            final HttpResponse<String> response = getStringHttpResponse(request);
+            getStringHttpResponse(request);
         } catch (Exception e)
         {
             throw new IOException("Error finding file: " + e.getMessage(), e);
@@ -246,7 +246,7 @@ public class BitbucketService extends ARestService
                     .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
 
-            final HttpResponse<String> response = getStringHttpResponse(request);
+            getStringHttpResponse(request);
         } catch (Exception e)
         {
             throw new IOException("Error updating repo description: " + e.getMessage(), e);
@@ -268,7 +268,7 @@ public class BitbucketService extends ARestService
                     .POST(HttpRequest.BodyPublishers.ofString(permissionJson))
                     .build();
 
-            final HttpResponse<String> response = getStringHttpResponse(request);
+            getStringHttpResponse(request);
         } catch (Exception e)
         {
             throw new IOException("Error updating repo description: " + e.getMessage(), e);
