@@ -75,7 +75,7 @@ public class GitLabService extends ARestService
         {
             List<String> queryParams = new ArrayList<>();
             queryParams.add("search=" + groupName);
-            HttpRequest request = HttpRequest.newBuilder(getUri(GROUPS_ENDPOINT, queryParams))
+            HttpRequest request = HttpRequest.newBuilder(getUri(GROUPS_ENDPOINT, queryParams, true))
                     .GET()
                     .build();
 
@@ -111,7 +111,7 @@ public class GitLabService extends ARestService
     {
         try
         {
-            HttpRequest request = HttpRequest.newBuilder(getUri(NAMESPACES_ENDPOINT + "/" + groupId, new ArrayList<>()))
+            HttpRequest request = HttpRequest.newBuilder(getUri(NAMESPACES_ENDPOINT + "/" + groupId))
                     .GET()
                     .build();
 
@@ -142,7 +142,7 @@ public class GitLabService extends ARestService
             jsonMap.put("path", groupName.replaceAll("//s+", "-").toLowerCase());
             if (parentGroupId != -1) jsonMap.put("parent_id", parentGroupId);
 
-            HttpRequest request = HttpRequest.newBuilder(getUri(GROUPS_ENDPOINT, new ArrayList<>()))
+            HttpRequest request = HttpRequest.newBuilder(getUri(GROUPS_ENDPOINT))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
@@ -196,7 +196,7 @@ public class GitLabService extends ARestService
             jsonMap.put("bitbucket_server_repo", bbRepoName);
             jsonMap.put("target_namespace", groupPath);
 
-            HttpRequest request = HttpRequest.newBuilder(getUri(IMPORT_BITBUCKET_ENDPOINT, new ArrayList<>()))
+            HttpRequest request = HttpRequest.newBuilder(getUri(IMPORT_BITBUCKET_ENDPOINT))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
@@ -221,7 +221,8 @@ public class GitLabService extends ARestService
     {
         try
         {
-            HttpRequest request = HttpRequest.newBuilder(getUri(GROUPS_ENDPOINT + "/" + groupId + "/projects", new ArrayList<>()))
+            final String endpoint = GROUPS_ENDPOINT + "/" + groupId + "/projects";
+            HttpRequest request = HttpRequest.newBuilder(getPagedUri(endpoint))
                     .GET()
                     .build();
 
@@ -262,7 +263,7 @@ public class GitLabService extends ARestService
             jsonMap.put("only_allow_merge_if_all_discussions_are_resolved", true);
             jsonMap.put("suggestion_commit_message", "%{branch_name}: Apply %{suggestions_count} suggestion(s) to %{files_count} file(s)");
 
-            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT + "/" + projectId, new ArrayList<>()))
+            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT + "/" + projectId))
                     .header("Content-Type", "application/json")
                     .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
@@ -288,7 +289,7 @@ public class GitLabService extends ARestService
             Map<String, Object> jsonMap = new HashMap<>();
             jsonMap.put("description", description);
 
-            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT + "/" + projectId, new ArrayList<>()))
+            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT + "/" + projectId))
                     .header("Content-Type", "application/json")
                     .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
@@ -301,17 +302,42 @@ public class GitLabService extends ARestService
     }
 
     /**
+     * Convenience method that doesn't include pagination parameters or other query params besides access token.
+     *
+     * @param endpoint    The REST endpoint
+     * @return The URI for the REST request
+     * @throws URISyntaxException if an error occurred constructing the URI
+     */
+    private URI getUri(String endpoint) throws URISyntaxException
+    {
+        return getUri(endpoint, new ArrayList<>(), false);
+    }
+
+    /**
+     * Convenience method that includes pagination parameters but no other query params besides access token.
+     *
+     * @param endpoint    The REST endpoint
+     * @return The URI for the REST request
+     * @throws URISyntaxException if an error occurred constructing the URI
+     */
+    private URI getPagedUri(String endpoint) throws URISyntaxException
+    {
+        return getUri(endpoint, new ArrayList<>(), true);
+    }
+
+    /**
      * Convenience method that defaults the pagination limit to the max value and includes the access token query param.
      *
      * @param endpoint    The REST endpoint
      * @param queryParams List of any additional query params to include in the request
+     * @param pagedRequest Indicates if the request is a paged request
      * @return The URI for the REST request
      * @throws URISyntaxException if an error occurred constructing the URI
      */
-    private URI getUri(String endpoint, List<String> queryParams) throws URISyntaxException
+    private URI getUri(String endpoint, List<String> queryParams, boolean pagedRequest) throws URISyntaxException
     {
         queryParams.add(0, accessTokenParam);
-        return getUri(endpoint, 100, -1, queryParams.toArray(new String[0]));
+        return getUri(endpoint, pagedRequest ? 100 : -1, -1, queryParams.toArray(new String[0]));
     }
 
     /**

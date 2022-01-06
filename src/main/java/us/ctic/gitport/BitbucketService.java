@@ -1,6 +1,7 @@
 package us.ctic.gitport;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.github.mizosoft.methanol.MediaType;
 import com.github.mizosoft.methanol.MultipartBodyPublisher;
 
 import java.io.File;
@@ -15,6 +16,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Service for interacting with the Bitbucket REST API.
@@ -52,19 +54,46 @@ public class BitbucketService extends ARestService
     }
 
     /**
+     * Gets the default branch information for the specified repo.
+     *
+     * @param projectKey The key of the project
+     * @param repoName   The name of the repo
+     * @return The info for the default branch.
+     * @throws IOException if an error occurred getting the branch.
+     */
+    public BitbucketBranch getDefaultBranch(String projectKey, String repoName) throws IOException
+    {
+        try
+        {
+            String endpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName + "/default-branch";
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+                    .GET()
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+            return objectMapper.readValue(response.body(), BitbucketBranch.class);
+        } catch (Exception e)
+        {
+            throw new IOException("Error finding file: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Attempts to find a file with the provided name in the specified repo.
      *
      * @param projectKey The key of the project
      * @param repoName   The name of the repo to query for files
      * @param fileName   The name of the file (can be partial name if exact name unknown)
      * @return The name of the file or null if the file doesn't exist.
+     * @throws IOException if an error occurred querying the files.
      */
     public String findFile(String projectKey, String repoName, String fileName) throws IOException
     {
         try
         {
             String endpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName + "/browse";
-            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint, true))
                     .GET()
                     .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
                     .build();
@@ -130,25 +159,33 @@ public class BitbucketService extends ARestService
     /**
      * Updates the file in the specified repo with the body of the provided file.
      *
-     * @param projectKey The key of the project
-     * @param repoName   The name of the repo to query for files
-     * @param fileName   The name of the file
-     * @param fileBody   A file containing the contents to commit to the repo in the named file
+     * @param projectKey    The key of the project
+     * @param repoName      The name of the repo to query for files
+     * @param fileName      The name of the file
+     * @param fileBody      A file containing the contents to commit to the repo in the named file
+     * @param commitMessage The message to use when commiting the updated file
+     * @param branchName    The name of the branch to update
+     * @param commitId      The commit id of the file before it was edited (or null if this is a new file)
      * @throws IOException if an error occurred putting the file.
      */
-    public void updateFile(String projectKey, String repoName, String fileName, File fileBody) throws IOException
+    public void updateFile(String projectKey, String repoName, String fileName, File fileBody, String commitMessage,
+                           String branchName, String commitId) throws IOException
     {
         try
         {
             final MultipartBodyPublisher multipartBodyPublisher = MultipartBodyPublisher.newBuilder()
-                    .formPart("content", fileName, HttpRequest.BodyPublishers.ofFile(fileBody.toPath()))
-                    .textPart("message", "Update " + fileName + " with deprecation banner")
+                    .filePart("content", fileBody.toPath(), MediaType.TEXT_ANY)
+                    .textPart("message", commitMessage)
+                    .textPart("branch", branchName)
+                    .textPart("sourceCommitId", commitId)
+                    .boundary(UUID.randomUUID().toString())
                     .build();
 
             String reposEndpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName + "/browse/" + fileName;
             HttpRequest request = HttpRequest.newBuilder(getUri(reposEndpoint))
                     .PUT(multipartBodyPublisher)
                     .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .header("Content-Type", "multipart/form-data; boundary=" + multipartBodyPublisher.boundary())
                     .build();
 
             final HttpResponse<String> response = getStringHttpResponse(request);
@@ -206,7 +243,7 @@ public class BitbucketService extends ARestService
             HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
                     .header("Content-Type", "application/json")
                     .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
                     .build();
 
             final HttpResponse<String> response = getStringHttpResponse(request);
@@ -252,7 +289,7 @@ public class BitbucketService extends ARestService
         try
         {
             String reposEndpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos";
-            HttpRequest request = HttpRequest.newBuilder(getUri(reposEndpoint))
+            HttpRequest request = HttpRequest.newBuilder(getUri(reposEndpoint, true))
                     .GET()
                     .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
                     .build();
@@ -285,7 +322,7 @@ public class BitbucketService extends ARestService
     }
 
     /**
-     * Convenience method that defaults the pagination limit to the max value.
+     * Convenience method that doesn't include pagination parameters.
      *
      * @param endpoint The REST endpoint
      * @return The URI for the REST request
@@ -293,7 +330,20 @@ public class BitbucketService extends ARestService
      */
     private URI getUri(String endpoint) throws URISyntaxException
     {
-        return getUri(endpoint, 1000, -1);
+        return getUri(endpoint, false);
+    }
+
+    /**
+     * Convenience method that defaults the pagination limit to the max value for paged requests.
+     *
+     * @param endpoint     The REST endpoint
+     * @param pagedRequest Indicates if the request is a paged request
+     * @return The URI for the REST request
+     * @throws URISyntaxException if an error occurred constructing the URI
+     */
+    private URI getUri(String endpoint, boolean pagedRequest) throws URISyntaxException
+    {
+        return getUri(endpoint, pagedRequest ? 1000 : -1, -1);
     }
 
     /**

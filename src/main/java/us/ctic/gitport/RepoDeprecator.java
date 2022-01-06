@@ -4,12 +4,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,7 +22,7 @@ public class RepoDeprecator
 {
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
     private static final String READ_ONLY_BRANCH_PERMISSION = "{\"type\":\"read-only\",\"matcher\":{\"id\": \"**/*\"," +
-            "\"displayId\":\"**/*\",\"type\":{\"id\":\"PATTERN\",\"name\":Pattern\"},\"active\":true}}";
+            "\"displayId\":\"**/*\",\"type\":{\"id\":\"PATTERN\",\"name\":\"Pattern\"},\"active\":true}}";
 
     private final BitbucketService bitbucketService;
     private final List<String> readmeBanner;
@@ -70,39 +71,59 @@ public class RepoDeprecator
      */
     private void updateReadme(String repoName, String newRepoUrl) throws IOException
     {
-        final File readmeFile;
-        String readmeFileName = bitbucketService.findFile(projectKey, repoName, "readme");
-        if (readmeFileName == null)
-        {
-            // Make a new readme file with just the deprecation banner
-            readmeFileName = "README.md";
-            readmeFile = Files.createTempFile(null, readmeFileName).toFile();
-            readmeFile.deleteOnExit();
-        } else
-        {
-            // Get a file with the contents of the current readme
-            readmeFile = bitbucketService.getFile(projectKey, repoName, readmeFileName);
-        }
-
         final List<String> bannerWithUrl = readmeBanner.stream()
                 .map(line -> line.replaceAll("\\$URL", newRepoUrl))
                 .collect(Collectors.toList());
 
-        // Make sure we haven't already updated this readme (perhaps manually or on a previous run of the script)
-        try (BufferedReader reader = new BufferedReader(new FileReader(readmeFile)))
+        final File readmeFile;
+        String readmeFileName = bitbucketService.findFile(projectKey, repoName, "readme");
+        if (readmeFileName == null)
         {
-            final String line = reader.readLine();
-            if (line != null && line.equals(bannerWithUrl.get(0)))
+            readmeFileName = "README.md";
+            readmeFile = null;
+        } else
+        {
+            // Get a file with the contents of the current readme
+            readmeFile = bitbucketService.getFile(projectKey, repoName, readmeFileName);
+
+            // Make sure we haven't already updated this readme (perhaps manually or on a previous run of the script)
+            try (BufferedReader reader = new BufferedReader(new FileReader(readmeFile)))
             {
-                logger.debug("Readme already has banner, so not adding again");
-                return;
+                final String line = reader.readLine();
+                if (line != null && line.equals(bannerWithUrl.get(0)))
+                {
+                    logger.debug("Readme already has banner, so not adding again");
+                    return;
+                }
             }
         }
 
-        // Note: we specify an open option of write to avoid the default, which truncates any existing file contents
-        Files.write(readmeFile.toPath(), bannerWithUrl, StandardOpenOption.WRITE);
+        // There's no way to prepend to a file, so create a new temp file, write the banner, then write the content of
+        // the original file
+        File updatedReadmeFile = Files.createTempFile(null, readmeFileName).toFile();
+        updatedReadmeFile.deleteOnExit();
+        Files.write(updatedReadmeFile.toPath(), bannerWithUrl);
 
-        bitbucketService.updateFile(projectKey, repoName, readmeFileName, readmeFile);
+        if (readmeFile != null)
+        {
+            try (BufferedReader reader = new BufferedReader(new FileReader(readmeFile));
+                 BufferedWriter writer = new BufferedWriter(new FileWriter(updatedReadmeFile, true)))
+            {
+                String line;
+                while ((line = reader.readLine()) != null)
+                {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
+        }
+
+        // We need the info about the branch in order to update the file
+        final BitbucketBranch defaultBranch = bitbucketService.getDefaultBranch(projectKey, repoName);
+
+        String commitMessage = "Update " + readmeFileName + " with deprecation banner";
+        bitbucketService.updateFile(projectKey, repoName, readmeFileName, updatedReadmeFile, commitMessage,
+                defaultBranch.getDisplayId(), defaultBranch.getLatestCommit());
     }
 
     /**
