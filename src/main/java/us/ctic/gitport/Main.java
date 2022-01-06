@@ -1,4 +1,4 @@
-package com.debuggingsuccess.gitport;
+package us.ctic.gitport;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -20,7 +20,7 @@ public class Main
 {
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-    public static final String CONFIG_ROOT = "com.debuggingsuccess.gitport";
+    public static final String CONFIG_ROOT = "us.ctic.gitport";
     private static final Config config = ConfigFactory.load();
 
     public static void main(String[] args)

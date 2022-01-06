@@ -3,7 +3,7 @@ plugins {
     id 'application'
 }
 
-group 'com.debuggingsuccess'
+group 'us.ctic'
 version '1.0.0-SNAPSHOT'
 
 wrapper {
@@ -11,7 +11,7 @@ wrapper {
 }
 
 application {
-    mainClassName = 'com.debuggingsuccess.gitport.Main'
+    mainClassName = 'us.ctic.gitport.Main'
 }
 
 repositories {

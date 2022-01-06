@@ -1,4 +1,4 @@
-package com.debuggingsuccess.gitport;
+package us.ctic.gitport;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
