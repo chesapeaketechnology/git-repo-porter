@@ -2,6 +2,10 @@
 Tool for porting a group of repos from Bitbucket to GitLab
 
 ## Usage
+**Prerequisite**: ask your GitLab admin to [enable importing from Bitbucket Server](
+https://docs.gitlab.com/ee/user/project/import/bitbucket_server.html#import-your-bitbucket-repositories). If this is
+_not_ enabled, the REST call to import will return a 403 Forbidden.
+
 1. Create a copy of _src/main/resources/application.conf_ and fill in all the settings with appropriate values.
    (Note: of course you could modify it in place as well, but take care not to commit the changes, as it will contain
    your plain text username and access token.) If you place the copy in the root of the repo, it will be ignored by git.

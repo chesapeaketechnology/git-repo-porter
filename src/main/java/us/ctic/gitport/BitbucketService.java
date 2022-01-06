@@ -1,14 +1,19 @@
 package us.ctic.gitport;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.github.mizosoft.methanol.MultipartBodyPublisher;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -19,18 +24,23 @@ import java.util.Map;
 public class BitbucketService extends ARestService
 {
     private static final String AUTHORIZATION_HEADER_NAME = "Authorization";
+    private static final String BRANCH_PERMISSIONS_API_ROOT = "/rest/branch-permissions/2.0/projects";
     private static final String REST_API_ROOT = "/rest/api/1.0";
     private static final String PROJECTS_ENDPOINT = REST_API_ROOT + "/projects";
     private final String authHeaderValue;
+    private final String username;
+    private final String accessToken;
 
     public BitbucketService(String host, String username, String accessToken)
     {
         super(host);
+        this.username = username;
+        this.accessToken = accessToken;
         authHeaderValue = getBasicAuthHeaderValue(username, accessToken);
     }
 
     /**
-     * @param username The username for accessing Bitbucket
+     * @param username    The username for accessing Bitbucket
      * @param accessToken The personal access token for accessing Bitbucket
      * @return The header value for basic authentication.
      * @see <a href="https://developer.atlassian.com/server/bitbucket/how-tos/example-basic-authentication/">
@@ -39,6 +49,193 @@ public class BitbucketService extends ARestService
     private String getBasicAuthHeaderValue(String username, String accessToken)
     {
         return "Basic " + Base64.getEncoder().encodeToString((username + ":" + accessToken).getBytes());
+    }
+
+    /**
+     * Attempts to find a file with the provided name in the specified repo.
+     *
+     * @param projectKey The key of the project
+     * @param repoName   The name of the repo to query for files
+     * @param fileName   The name of the file (can be partial name if exact name unknown)
+     * @return The name of the file or null if the file doesn't exist.
+     */
+    public String findFile(String projectKey, String repoName, String fileName) throws IOException
+    {
+        try
+        {
+            String endpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName + "/browse";
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+                    .GET()
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+
+            String lowercaseFileName = fileName.toLowerCase();
+            JsonNode jsonNode = objectMapper.readTree(response.body());
+            for (JsonNode valueNode : jsonNode.get("children").get("values"))
+            {
+                final JsonNode pathNode = valueNode.get("path");
+                String name = pathNode.get("name").textValue();
+                if (name.toLowerCase().contains(lowercaseFileName)) return name;
+            }
+        } catch (Exception e)
+        {
+            throw new IOException("Error finding file: " + e.getMessage(), e);
+        }
+
+        return null;
+    }
+
+    /**
+     * Retrieves the contents of the file with the provided name in the specified repo.
+     *
+     * @param projectKey The key of the project
+     * @param repoName   The name of the repo to query for files
+     * @param fileName   The name of the file
+     * @return A temp file containing the contents of the file.
+     * @throws IOException if an error occurred getting the file.
+     */
+    public File getFile(String projectKey, String repoName, String fileName) throws IOException
+    {
+        try
+        {
+            String endpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName + "/browse/" + fileName;
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+                    .GET()
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+
+            final File file = Files.createTempFile(null, fileName).toFile();
+            file.deleteOnExit();
+
+            List<String> lines = new ArrayList<>();
+            JsonNode jsonNode = objectMapper.readTree(response.body());
+            for (JsonNode valueNode : jsonNode.get("lines"))
+            {
+                lines.add(valueNode.get("text").textValue());
+            }
+
+            Files.write(file.toPath(), lines);
+
+            return file;
+        } catch (Exception e)
+        {
+            throw new IOException("Error finding file: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Updates the file in the specified repo with the body of the provided file.
+     *
+     * @param projectKey The key of the project
+     * @param repoName   The name of the repo to query for files
+     * @param fileName   The name of the file
+     * @param fileBody   A file containing the contents to commit to the repo in the named file
+     * @throws IOException if an error occurred putting the file.
+     */
+    public void updateFile(String projectKey, String repoName, String fileName, File fileBody) throws IOException
+    {
+        try
+        {
+            final MultipartBodyPublisher multipartBodyPublisher = MultipartBodyPublisher.newBuilder()
+                    .formPart("content", fileName, HttpRequest.BodyPublishers.ofFile(fileBody.toPath()))
+                    .textPart("message", "Update " + fileName + " with deprecation banner")
+                    .build();
+
+            String reposEndpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName + "/browse/" + fileName;
+            HttpRequest request = HttpRequest.newBuilder(getUri(reposEndpoint))
+                    .PUT(multipartBodyPublisher)
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error finding file: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gets the description on the specified repo.
+     *
+     * @param projectKey The key of the project
+     * @param repoName   The name of the repo to update
+     * @return The description for the repo or null if one isn't set.
+     * @throws IOException if an error occurred getting the description.
+     */
+    public String getRepoDescription(String projectKey, String repoName) throws IOException
+    {
+        try
+        {
+            String endpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName;
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+                    .header("Content-Type", "application/json")
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+            JsonNode jsonNode = objectMapper.readTree(response.body());
+            final JsonNode descriptionNode = jsonNode.get("description");
+            return descriptionNode == null ? null : descriptionNode.textValue();
+        } catch (Exception e)
+        {
+            throw new IOException("Error updating repo description: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Updates the description on the specified repo.
+     *
+     * @param projectKey  The key of the project
+     * @param repoName    The name of the repo to update
+     * @param description The new description
+     * @throws IOException if an error occurred updating the description.
+     */
+    public void updateRepoDescription(String projectKey, String repoName, String description) throws IOException
+    {
+        try
+        {
+            Map<String, Object> jsonMap = new HashMap<>();
+            jsonMap.put("description", description);
+
+            String endpoint = PROJECTS_ENDPOINT + "/" + projectKey + "/repos/" + repoName;
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+                    .header("Content-Type", "application/json")
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error updating repo description: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * @see <a href="https://docs.atlassian.com/bitbucket-server/rest/5.0.1/bitbucket-ref-restriction-rest.html">
+     * REST Resources Provided By: Bitbucket Server - Ref Restriction</a>
+     */
+    public void addBranchPermission(String projectKey, String repoName, String permissionJson) throws IOException
+    {
+        try
+        {
+            String endpoint = BRANCH_PERMISSIONS_API_ROOT + "/" + projectKey + "/repos/" + repoName + "/restrictions";
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint))
+                    .header("Content-Type", "application/json")
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .POST(HttpRequest.BodyPublishers.ofString(permissionJson))
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error updating repo description: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -89,6 +286,7 @@ public class BitbucketService extends ARestService
 
     /**
      * Convenience method that defaults the pagination limit to the max value.
+     *
      * @param endpoint The REST endpoint
      * @return The URI for the REST request
      * @throws URISyntaxException if an error occurred constructing the URI
@@ -120,5 +318,15 @@ public class BitbucketService extends ARestService
     protected String getStartingPageParamName()
     {
         return "start";
+    }
+
+    public String getUsername()
+    {
+        return username;
+    }
+
+    public String getAccessToken()
+    {
+        return accessToken;
     }
 }

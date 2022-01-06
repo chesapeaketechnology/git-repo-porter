@@ -83,4 +83,9 @@ public abstract class ARestService
 
         return response;
     }
+
+    public String getHost()
+    {
+        return host;
+    }
 }

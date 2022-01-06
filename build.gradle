@@ -20,6 +20,7 @@ repositories {
 
 dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.1'
+    implementation 'com.github.mizosoft.methanol:methanol:1.6.0'
     implementation "com.typesafe:config:1.4.1"
     implementation "org.slf4j:slf4j-log4j12:1.7.32"
 

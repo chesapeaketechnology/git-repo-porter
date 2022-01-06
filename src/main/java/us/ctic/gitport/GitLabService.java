@@ -161,37 +161,6 @@ public class GitLabService extends ARestService
     }
 
     /**
-     * Creates a project by importing the repo from the provided URL.
-     *
-     * @param projectName   The name of the project
-     * @param importUrl     The import URL (which should include the username and password/access token)
-     * @param parentGroupId The id of the GitLab group where the project should be created
-     * @throws IOException if an error occurred creating the project
-     */
-    public void createProjectFromUrl(String projectName, String importUrl, int parentGroupId) throws IOException
-    {
-        try
-        {
-            String groupPath = getGroupPath(parentGroupId);
-
-            Map<String, Object> jsonMap = new HashMap<>();
-            jsonMap.put("name", projectName);
-            jsonMap.put("import_url", importUrl);
-            jsonMap.put("namespace_id", parentGroupId);
-
-            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT, new ArrayList<>()))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
-                    .build();
-
-            final HttpResponse<String> response = getStringHttpResponse(request);
-        } catch (Exception e)
-        {
-            throw new IOException("Error creating project " + projectName + ": " + e.getMessage(), e);
-        }
-    }
-
-    /**
      * Imports a repo from a Bitbucket instance into GitLab.
      *
      * @param bbServerUrl   The Bitbucket server URL
@@ -200,18 +169,27 @@ public class GitLabService extends ARestService
      * @param bbProjectKey  The Bitbucket project key
      * @param bbRepoName    The name of the Bitbucket repo
      * @param parentGroupId The id of the target group in GitLab
+     * @return An object containing the details of the repo that was imported or null if the repo was not imported
+     * @throws IOException if an error occurred importing the repo
      * @see <a href="https://docs.gitlab.com/ee/api/import.html#import-repository-from-bitbucket-server">Import
      * repository from Bitbucket Server</a>
      */
-    public void importFromBitbucket(String bbServerUrl, String bbUsername, String bbAccessToken, String bbProjectKey,
-                                    String bbRepoName, int parentGroupId) throws IOException
+    public GitLabRepo importFromBitbucket(String bbServerUrl, String bbUsername, String bbAccessToken, String bbProjectKey,
+                                          String bbRepoName, int parentGroupId) throws IOException
     {
         try
         {
+            // First double check that there isn't already a repo with that name
+            if (isRepoInGroup(bbRepoName, parentGroupId))
+            {
+                logger.info("Repo {} already exists in group; not porting", bbRepoName);
+                return null;
+            }
+
             String groupPath = getGroupPath(parentGroupId);
 
             Map<String, Object> jsonMap = new HashMap<>();
-            jsonMap.put("bitbucket_server_url", bbServerUrl);
+            jsonMap.put("bitbucket_server_url", "https://" + bbServerUrl);
             jsonMap.put("bitbucket_server_username", bbUsername);
             jsonMap.put("personal_access_token", bbAccessToken);
             jsonMap.put("bitbucket_server_project", bbProjectKey);
@@ -224,9 +202,101 @@ public class GitLabService extends ARestService
                     .build();
 
             final HttpResponse<String> response = getStringHttpResponse(request);
+            return objectMapper.readValue(response.body(), GitLabRepo.class);
         } catch (Exception e)
         {
             throw new IOException("Error importing repo " + bbRepoName + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Attempts to find a repo with the specified name in the group.
+     *
+     * @param repoName The name of the repo
+     * @param groupId  The id of the group in GitLab
+     * @return True if the repo already exists in the group
+     * @throws IOException if an error occurred querying the group
+     */
+    public boolean isRepoInGroup(String repoName, int groupId) throws IOException
+    {
+        try
+        {
+            HttpRequest request = HttpRequest.newBuilder(getUri(GROUPS_ENDPOINT + "/" + groupId + "/projects", new ArrayList<>()))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+
+            JsonNode jsonNode = objectMapper.readTree(response.body());
+            Iterator<JsonNode> nodeIterator = jsonNode.elements();
+            while (nodeIterator.hasNext())
+            {
+                JsonNode node = nodeIterator.next();
+
+                if (node.get("name").textValue().equalsIgnoreCase(repoName))
+                {
+                    return true;
+                }
+            }
+        } catch (Exception e)
+        {
+            throw new IOException("Error getting projects in group " + groupId + ": " + e.getMessage(), e);
+        }
+
+        return false;
+    }
+
+    /**
+     * Configures the project with the settings recommended for our team.
+     * TODO: make this configurable in the future.
+     *
+     * @param projectId The id of the project
+     * @throws IOException if an error occurred configuring the project
+     */
+    public void configureProjectSettings(int projectId) throws IOException
+    {
+        try
+        {
+            Map<String, Object> jsonMap = new HashMap<>();
+            jsonMap.put("squash_option", "never");
+            jsonMap.put("only_allow_merge_if_all_discussions_are_resolved", true);
+            jsonMap.put("suggestion_commit_message", "%{branch_name}: Apply %{suggestions_count} suggestion(s) to %{files_count} file(s)");
+
+            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT + "/" + projectId, new ArrayList<>()))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error configuring repo " + projectId + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Updates the description on the specified repo.
+     *
+     * @param projectId   The id of the project
+     * @param description The new description
+     * @throws IOException if an error occurred updating the description.
+     */
+    public void updateProjectDescription(int projectId, String description) throws IOException
+    {
+        try
+        {
+            Map<String, Object> jsonMap = new HashMap<>();
+            jsonMap.put("description", description);
+
+            HttpRequest request = HttpRequest.newBuilder(getUri(PROJECTS_ENDPOINT + "/" + projectId, new ArrayList<>()))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(jsonMap)))
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error updating repo description: " + e.getMessage(), e);
         }
     }
 
