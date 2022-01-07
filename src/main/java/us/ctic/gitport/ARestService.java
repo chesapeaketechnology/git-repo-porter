@@ -75,7 +75,8 @@ public abstract class ARestService
                 HttpResponse.BodyHandlers.ofString());
 
         final int statusCode = response.statusCode();
-        if (statusCode != HttpURLConnection.HTTP_OK && statusCode != HttpURLConnection.HTTP_CREATED)
+        if (statusCode != HttpURLConnection.HTTP_OK && statusCode != HttpURLConnection.HTTP_CREATED &&
+                statusCode != HttpURLConnection.HTTP_NO_CONTENT)
         {
             throw new IOException(request.method() + " from " + request.uri() + " was unsuccessful. Status code: " +
                     statusCode + ". Response body: " + response.body());

@@ -254,6 +254,11 @@ public class BitbucketService extends ARestService
     }
 
     /**
+     * Adds the provided branch permission to the repo.
+     *
+     * @param projectKey     The key of the project
+     * @param repoName       The name of the repo to update
+     * @param permissionJson The branch permission as a JSON string
      * @see <a href="https://docs.atlassian.com/bitbucket-server/rest/5.0.1/bitbucket-ref-restriction-rest.html">
      * REST Resources Provided By: Bitbucket Server - Ref Restriction</a>
      */
@@ -266,6 +271,69 @@ public class BitbucketService extends ARestService
                     .header("Content-Type", "application/json")
                     .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
                     .POST(HttpRequest.BodyPublishers.ofString(permissionJson))
+                    .build();
+
+            getStringHttpResponse(request);
+        } catch (Exception e)
+        {
+            throw new IOException("Error adding branch permission: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Clears all current repository-level branch permissions for the repo.
+     *
+     * @param projectKey The key of the project
+     * @param repoName   The name of the repo to update
+     * @see <a href="https://docs.atlassian.com/bitbucket-server/rest/5.0.1/bitbucket-ref-restriction-rest.html">
+     * REST Resources Provided By: Bitbucket Server - Ref Restriction</a>
+     */
+    public void clearBranchPermissions(String projectKey, String repoName) throws IOException
+    {
+        try
+        {
+            String endpoint = BRANCH_PERMISSIONS_API_ROOT + "/" + projectKey + "/repos/" + repoName + "/restrictions";
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint, true))
+                    .header("Content-Type", "application/json")
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = getStringHttpResponse(request);
+            JsonNode jsonNode = objectMapper.readTree(response.body());
+            for (JsonNode node : jsonNode.get("values"))
+            {
+                final String scopeType = node.get("scope").get("type").textValue();
+                if (scopeType.equals("REPOSITORY"))
+                {
+                    final int id = node.get("id").intValue();
+                    deleteBranchPermission(projectKey, repoName, id);
+                }
+            }
+        } catch (Exception e)
+        {
+            throw new IOException("Error updating repo description: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Deletes the specified branch permissions from the repo.
+     *
+     * @param projectKey The key of the project
+     * @param repoName   The name of the repo to update
+     * @param restrictionId The id of the branch permission to delete
+     * @see <a href="https://docs.atlassian.com/bitbucket-server/rest/5.0.1/bitbucket-ref-restriction-rest.html">
+     * REST Resources Provided By: Bitbucket Server - Ref Restriction</a>
+     */
+    public void deleteBranchPermission(String projectKey, String repoName, int restrictionId) throws IOException
+    {
+        try
+        {
+            String endpoint = BRANCH_PERMISSIONS_API_ROOT + "/" + projectKey + "/repos/" + repoName + "/restrictions/" + restrictionId;
+            HttpRequest request = HttpRequest.newBuilder(getUri(endpoint, true))
+                    .header("Content-Type", "application/json")
+                    .header(AUTHORIZATION_HEADER_NAME, authHeaderValue)
+                    .DELETE()
                     .build();
 
             getStringHttpResponse(request);

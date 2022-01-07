@@ -57,6 +57,8 @@ public class RepoDeprecator
     {
         logger.info("Deprecating repo {}...", repoName);
 
+        bitbucketService.clearBranchPermissions(projectKey, repoName);
+
         updateReadme(repoName, newRepoUrl);
         updateDescription(repoName, newRepoUrl);
         bitbucketService.addBranchPermission(projectKey, repoName, READ_ONLY_BRANCH_PERMISSION);
