@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +29,7 @@ public class Main
         String bitbucketUsername = config.getString(CONFIG_ROOT + ".source.username");
         String bitbucketAccessToken = config.getString(CONFIG_ROOT + ".source.accessToken");
         String projectKey = config.getString(CONFIG_ROOT + ".source.projectKey");
+        String reposToIncludeString = config.getString(CONFIG_ROOT + ".source.reposToInclude");
         String reposToExcludeString = config.getString(CONFIG_ROOT + ".source.reposToExclude");
         List<String> readmeBanner = config.getStringList(CONFIG_ROOT + ".source.readmeBanner");
         String description = config.getString(CONFIG_ROOT + ".source.description");
@@ -49,8 +51,20 @@ public class Main
         Map<String, String> repoUrlMap = bitbucketService.getRepoUrls(projectKey);
         logger.debug("Repos in Bitbucket project {}: {}", projectKey, repoUrlMap.keySet());
 
+        // If the user only wants to port certain repos in the project, remove all the others
+        if (reposToIncludeString != null && !reposToIncludeString.isBlank())
+        {
+            final List<String> reposToInclude = Arrays.asList(reposToIncludeString.toLowerCase().split(","));
+            logger.debug("Including only repos: {}", reposToInclude);
+            final List<String> reposInProject = new ArrayList<>(repoUrlMap.keySet());
+            for (String repoName : reposInProject)
+            {
+                if (!reposToInclude.contains(repoName)) repoUrlMap.remove(repoName);
+            }
+        }
+
         final List<String> reposToExclude = reposToExcludeString == null ? Collections.emptyList() :
-                Arrays.asList(reposToExcludeString.split(","));
+                Arrays.asList(reposToExcludeString.toLowerCase().split(","));
         logger.debug("Excluding repos: {}", reposToExclude);
         reposToExclude.forEach(repoUrlMap::remove);
 

@@ -20,9 +20,17 @@ _not_ enabled, the REST call to import will return a 403 Forbidden.
       https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html)) and add it to the _application.conf_ as the
       `target.accessToken` setting.
 
+2. If you only wish to port a single repo or some subset of the Bitbucket project, use the `reposToInclude` or
+   `reposToExlude` settings:
+   1. To port a single repo, set `reposToInclude` to the name of the repo, e.g., "my-repo".
+   3. To port only a few repos, set `reposToInclude` to the names of the repos, separated by commas, e.g., 
+      "my-repo,my-other-repo".
+   4. To port most of the repos in the project, set `reposToExclude` to the names of the repos to ignore, separated by
+      commas.
+
 3. Execute the `run` task with the system property `config.file` set to the location of your local _application.conf_:
    ```
-   gradlew run -Dconfig.file=path/to/local/application.conf`
+   gradlew run -Dconfig.file=path/to/local/application.conf
    ```
    
    For example, if the _application.conf_ file was copied to the root of the repo:
@@ -30,5 +38,5 @@ _not_ enabled, the REST call to import will return a 403 Forbidden.
    gradlew run -Dconfig.file=application.conf
    ```
 
-   This will port all repos from the specified Bitbucket project (minus any repos included in the CSV list of 
-   `reposToExclude`) to GitLab in the specified group.
+   This will port all repos from the specified Bitbucket project unless repos to include/exclude were specified via the
+   `reposToInclude` or `reposToExlude` settings.
