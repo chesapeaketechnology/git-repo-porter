@@ -49,7 +49,7 @@ public class GitLabService extends ARestService
     {
         try
         {
-            int groupId = getGroupId(groupName);
+            int groupId = getGroupId(groupName, parentGroupId);
 
             if (groupId != -1)
             {
@@ -65,11 +65,12 @@ public class GitLabService extends ARestService
     }
 
     /**
-     * @param groupName The name of the group to find
+     * @param groupName     The name of the group to find
+     * @param parentGroupId The id of the parent group if the new group is to be a sub-group, or -1 for a top-level group
      * @return The id of the group or -1 if it doesn't exist
      * @throws IOException if an error occurred querying for the group
      */
-    public int getGroupId(String groupName) throws IOException
+    public int getGroupId(String groupName, int parentGroupId) throws IOException
     {
         try
         {
@@ -91,7 +92,12 @@ public class GitLabService extends ARestService
 
                 if (node.get("name").textValue().equalsIgnoreCase(groupName))
                 {
-                    return node.get("id").intValue();
+                    // It is possible to have groups with the same name so check the parent id
+                    final JsonNode parentIdNode = node.get("parent_id");
+                    if ((parentGroupId == -1 && parentIdNode.isNull()) || parentGroupId == parentIdNode.intValue())
+                    {
+                        return node.get("id").intValue();
+                    }
                 }
             }
         } catch (Exception e)
