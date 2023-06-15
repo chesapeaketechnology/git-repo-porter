@@ -26,7 +26,7 @@ Tool for porting a group of repos from Bitbucket to GitLab
       `target.accessToken` setting.
 
 2. If you only wish to port a single repo or some subset of the Bitbucket project, use the `reposToInclude` or
-   `reposToExlude` settings:
+   `reposToExclude` settings:
    1. To port a single repo, set `reposToInclude` to the name of the repo, e.g., "my-repo".
    3. To port only a few repos, set `reposToInclude` to the names of the repos, separated by commas, e.g., 
       "my-repo,my-other-repo".
@@ -44,4 +44,4 @@ Tool for porting a group of repos from Bitbucket to GitLab
    ```
 
    This will port all repos from the specified Bitbucket project unless repos to include/exclude were specified via the
-   `reposToInclude` or `reposToExlude` settings.
+   `reposToInclude` or `reposToExclude` settings.
